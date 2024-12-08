@@ -9,6 +9,8 @@ from tqdm import tqdm
 from .builder import DATASETS
 from .nuscenes_dataset import NuScenesDataset
 from .occ_metrics import Metric_mIoU, Metric_FScore
+import pyquaternion
+from nuscenes.utils.data_classes import Box as NuScenesBox
 
 colors_map = np.array(
     [
@@ -60,13 +62,45 @@ class NuScenesDatasetOccpancy(NuScenesDataset):
         input_dict['occ_gt_path'] = self.data_infos[index]['occ_path']
         return input_dict
 
-    def evaluate(self, occ_results, runner=None, show_dir=None, **eval_kwargs):
+    def evaluate(self, 
+                 results, 
+                 metric=['mAP', 'mIoU'], 
+                 result_names=['pts_bbox'],
+                 runner=None, 
+                 show=False, 
+                 show_dir=None, 
+                 out_dir=None, 
+                 jsonfile_prefix=None, 
+                 pipeline=None,
+                 **eval_kwargs):
+
+        if 'mAP' in metric:
+            print('\nStarting Evaluation 3D Detection Results...')
+            det_results = [res['pts_bbox'] for res in results]
+            occ_results = [res['occ_res'] for res in results]
+            result_files, tmp_dir = self.format_results(det_results, jsonfile_prefix)
+            breakpoint()
+            if isinstance(result_files, dict):
+                results_dict = dict()
+                for name in result_names:
+                    print('Evaluating bboxes of {}'.format(name))
+                    ret_dict = self._evaluate_single(result_files[name])
+                results_dict.update(ret_dict)
+            elif isinstance(result_files, str):
+                results_dict = self._evaluate_single(result_files)
+                breakpoint()
+            if tmp_dir is not None:
+                tmp_dir.cleanup()
+
+            if show or out_dir:
+                self.show(results, out_dir, show=show, pipeline=pipeline)
+             
         self.occ_eval_metrics = Metric_mIoU(
             num_classes=18,
             use_lidar_mask=False,
             use_image_mask=True)
 
-        print('\nStarting Evaluation...')
+        print('\nStarting Evaluation OCC Prediction Results...')
         for index, occ_pred in enumerate(tqdm(occ_results)):
             info = self.data_infos[index]
 
@@ -85,6 +119,76 @@ class NuScenesDatasetOccpancy(NuScenesDataset):
 
         return self.occ_eval_metrics.count_miou()
 
+    def _format_single_frame_bbox(self, results, jsonfile_prefix=None):
+        if 'pts_bbox' in results[0].keys():
+            results = results[0]['pts_bbox']
+
+        nusc_annos = {}
+        mapped_class_names = self.CLASSES
+
+        print('Start to convert detection format...')
+        for sample_id, det in enumerate(mmcv.track_iter_progress(results)):
+            boxes = det['boxes_3d'].tensor.numpy()
+            scores = det['scores_3d'].numpy()
+            labels = det['labels_3d'].numpy()
+            sample_token = self.data_infos[sample_id]['token']
+
+            trans = self.data_infos[sample_id]['cams'][
+                self.ego_cam]['ego2global_translation']
+            rot = self.data_infos[sample_id]['cams'][
+                self.ego_cam]['ego2global_rotation']
+            rot = pyquaternion.Quaternion(rot)
+            annos = list()
+            for i, box in enumerate(boxes):
+                name = mapped_class_names[labels[i]]
+                center = box[:3]
+                wlh = box[[4, 3, 5]]
+                box_yaw = box[6]
+                box_vel = box[7:].tolist()
+                box_vel.append(0)
+                quat = pyquaternion.Quaternion(axis=[0, 0, 1], radians=box_yaw)
+                nusc_box = NuScenesBox(center, wlh, quat, velocity=box_vel)
+                nusc_box.rotate(rot)
+                nusc_box.translate(trans)
+                if np.sqrt(nusc_box.velocity[0]**2 +
+                           nusc_box.velocity[1]**2) > 0.2:
+                    if name in [
+                            'car',
+                            'construction_vehicle',
+                            'bus',
+                            'truck',
+                            'trailer',
+                    ]:
+                        attr = 'vehicle.moving'
+                    elif name in ['bicycle', 'motorcycle']:
+                        attr = 'cycle.with_rider'
+                    else:
+                        attr = self.DefaultAttribute[name]
+                else:
+                    if name in ['pedestrian']:
+                        attr = 'pedestrian.standing'
+                    elif name in ['bus']:
+                        attr = 'vehicle.stopped'
+                    else:
+                        attr = self.DefaultAttribute[name]
+                nusc_anno = dict(
+                    sample_token=sample_token,
+                    translation=nusc_box.center.tolist(),
+                    size=nusc_box.wlh.tolist(),
+                    rotation=nusc_box.orientation.elements.tolist(),
+                    velocity=nusc_box.velocity[:2],
+                    detection_name=name,
+                    detection_score=float(scores[i]),
+                    attribute_name=attr,
+                )
+                annos.append(nusc_anno)
+            # other views results of the same frame should be concatenated
+            if sample_token in nusc_annos:
+                nusc_annos[sample_token].extend(annos)
+            else:
+                nusc_annos[sample_token] = annos
+        return nusc_annos
+    
     def vis_occ(self, semantics):
         # simple visualization of result in BEV
         semantics_valid = np.logical_not(semantics == 17)

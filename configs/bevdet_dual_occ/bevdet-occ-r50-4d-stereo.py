@@ -218,6 +218,7 @@ model = dict(
 # Data
 dataset_type = 'NuScenesDatasetOccpancy' # OCC
 data_root = 'data/nuscenes/'
+data_version = 'v1.0-mini'
 file_client_args = dict(backend='disk')
 # BEV
 bda_aug_conf = dict(
@@ -343,5 +344,6 @@ custom_hooks = [
 ]
 
 # OCC
-load_from="/root/BEVDet/ckpts/bevdet-occ-r50-4d-stereo-24e.pth"
+load_from = "/root/BEVDet/work_dirs/bevdet-occ-r50-4d-stereo/1207_v2/epoch_14_ema.pth"
+# load_from="/root/BEVDet/ckpts/bevdet-occ-r50-4d-stereo-24e.pth"
 # fp16 = dict(loss_scale='dynamic')

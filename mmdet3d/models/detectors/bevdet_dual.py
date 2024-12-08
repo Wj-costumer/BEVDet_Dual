@@ -38,7 +38,6 @@ class BEVStereo4D_Dual(BEVStereo4D):
                 nn.Softplus(),
                 nn.Linear(self.out_dim*2, num_classes),
             )
-        # self.pts_bbox_head = None
         self.use_mask = use_mask
         self.num_classes = num_classes
         self.loss_occ = build_loss(loss_occ)
@@ -47,7 +46,7 @@ class BEVStereo4D_Dual(BEVStereo4D):
         self.voxel_pool = nn.MaxPool1d(kernel_size=16)
         
         for name, param in self.named_parameters():
-            if 'img_' in name:
+            if 'img_backbone' in name or 'img_neck' in name or 'img_view_transformer' in name:
                 param.requires_grad = False
         print("=====DEBUG=====: finish build model")
 
@@ -78,7 +77,6 @@ class BEVStereo4D_Dual(BEVStereo4D):
         """Test function without augmentaiton."""
         img_feats, _, _ = self.extract_feat(
             points, img=img, img_metas=img_metas, **kwargs)
-        torch.save(img_feats, "./debug_logs/img_feats_0.pt")
         # 后面多帧预测的时候需要修改一下
         results_list = [dict() for _ in range(len(img_metas))]
        
@@ -90,8 +88,6 @@ class BEVStereo4D_Dual(BEVStereo4D):
         
         
         occ_pred = self.final_conv(img_feats[0]).permute(0, 4, 3, 2, 1)
-        torch.save(occ_pred, './debug_logs/occ_pred_0.pt')
-        # breakpoint()
         # bncdhw->bnwhdc
         if self.use_predicter:
             occ_pred = self.predicter(occ_pred)
@@ -143,14 +139,6 @@ class BEVStereo4D_Dual(BEVStereo4D):
         Returns:
             dict: Losses of different branches.
         """
-        # optim_params = []
-        # for name, param in self.named_parameters():
-        #     # if 'pts_bbox_head' not in name:
-        #     if param.requires_grad == True:
-        #         optim_params.append(name)
-        #     if name == 'img_backbone.conv1.weight':
-        #         print("debug: ", param[0, 0, :2, :2])
-        # breakpoint()
         
         img_feats, pts_feats, depth = self.extract_feat(
             points, img=img_inputs, img_metas=img_metas, **kwargs)
@@ -177,6 +165,62 @@ class BEVStereo4D_Dual(BEVStereo4D):
         losses_pts = self.forward_pts_train([bev_feats], gt_bboxes_3d,
                                             gt_labels_3d, img_metas,
                                             gt_bboxes_ignore)
-        losses.update(losses_pts)
-        # breakpoint()
+        for task, loss in losses_pts.items():
+            # if task in ['task0.loss_vel', 'task0.loss_yaw', 'task0.loss_whl']:
+            #     losses[task] = loss
+            # else:
+            #     losses[task] = loss * 0.1
+            losses[task] = loss * 0.05
         return losses
+
+@DETECTORS.register_module()
+class BEVStereo4D_DualTRT(BEVStereo4D_Dual):
+
+    def result_serialize(self, outs):
+        outs_ = []
+        for out in outs:
+            for key in ['reg', 'height', 'dim', 'rot', 'vel', 'heatmap']:
+                outs_.append(out[0][key])
+        return outs_
+
+    def result_deserialize(self, outs):
+        outs_ = []
+        keys = ['reg', 'height', 'dim', 'rot', 'vel', 'heatmap']
+        for head_id in range(len(outs) // 6):
+            outs_head = [dict()]
+            for kid, key in enumerate(keys):
+                outs_head[0][key] = outs[head_id * 6 + kid]
+            outs_.append(outs_head)
+        return outs_
+
+    def forward(
+        self,
+        img,
+        ranks_depth,
+        ranks_feat,
+        ranks_bev,
+        interval_starts,
+        interval_lengths,
+    ):
+        x = self.img_backbone(img)
+        x = self.img_neck(x)
+        x = self.img_view_transformer.depth_net(x)
+        depth = x[:, :self.img_view_transformer.D].softmax(dim=1)
+        tran_feat = x[:, self.img_view_transformer.D:(
+            self.img_view_transformer.D +
+            self.img_view_transformer.out_channels)]
+        tran_feat = tran_feat.permute(0, 2, 3, 1)
+        x = TRTBEVPoolv2.apply(depth.contiguous(), tran_feat.contiguous(),
+                               ranks_depth, ranks_feat, ranks_bev,
+                               interval_starts, interval_lengths)
+        x = x.permute(0, 3, 1, 2).contiguous()
+        bev_feat = self.bev_encoder(x)
+        outs = self.pts_bbox_head([bev_feat])
+        outs = self.result_serialize(outs)
+        return outs
+
+    def get_bev_pool_input(self, input):
+        input = self.prepare_inputs(input)
+        coor = self.img_view_transformer.get_lidar_coor(*input[1:7])
+        return self.img_view_transformer.voxel_pooling_prepare_v2(coor)
+

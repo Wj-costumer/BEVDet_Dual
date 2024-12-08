@@ -269,7 +269,7 @@ share_data_config = dict(
 
 test_data_config = dict(
     pipeline=test_pipeline,
-    ann_file=data_root + 'bevdetv3-nuscenes_infos_val.pkl')
+    ann_file=data_root + 'bevdetv3-nuscenes_infos_val_mini.pkl')
 
 data = dict(
     samples_per_gpu=8,
@@ -278,7 +278,7 @@ data = dict(
         type='CBGSDataset',
         dataset=dict(
         data_root=data_root,
-        ann_file=data_root + 'bevdetv3-nuscenes_infos_train.pkl',
+        ann_file=data_root + 'bevdetv3-nuscenes_infos_train_mini.pkl',
         pipeline=train_pipeline,
         classes=class_names,
         test_mode=False,

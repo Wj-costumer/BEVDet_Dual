@@ -44,7 +44,10 @@ class BEVStereo4DOCC(BEVStereo4D):
         self.loss_occ = build_loss(loss_occ)
         self.class_wise = class_wise
         self.align_after_view_transfromation = False
-
+        for name, param in self.named_parameters():
+            if 'predicter' not in name:
+                param.requires_grad = False
+        print("=====DEBUG=====: finish build model")
     def loss_single(self,voxel_semantics,mask_camera,preds):
         loss_ = dict()
         voxel_semantics=voxel_semantics.long()
@@ -72,7 +75,10 @@ class BEVStereo4DOCC(BEVStereo4D):
         """Test function without augmentaiton."""
         img_feats, _, _ = self.extract_feat(
             points, img=img, img_metas=img_metas, **kwargs)
+        torch.save(img_feats, "./debug_logs/img_feats_0.pt")
         occ_pred = self.final_conv(img_feats[0]).permute(0, 4, 3, 2, 1)
+        torch.save(occ_pred, './debug_logs/occ_pred_0.pt')
+        # breakpoint()
         # bncdhw->bnwhdc
         if self.use_predicter:
             occ_pred = self.predicter(occ_pred)

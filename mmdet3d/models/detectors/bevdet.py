@@ -324,7 +324,7 @@ class BEVDet4D(BEVDet):
 
         # add bev data augmentation
         bda_ = torch.zeros((n, 1, 4, 4), dtype=grid.dtype).to(grid)
-        bda_[:, :, :3, :3] = bda.unsqueeze(1)
+        bda_[:, :, :3, :3] = bda[:, :3, :3].unsqueeze(1)
         bda_[:, :, 3, 3] = 1
         c02l0 = bda_.matmul(c02l0)
         if bda_adj is not None:

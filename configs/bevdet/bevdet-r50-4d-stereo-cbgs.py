@@ -97,7 +97,7 @@ model = dict(
     align_after_view_transfromation=False,
     num_adj=len(range(*multi_adj_frame_id_cfg)),
     img_backbone=dict(
-        pretrained='torchvision://resnet50',
+        # pretrained='torchvision://resnet50',
         type='ResNet',
         depth=50,
         num_stages=4,
@@ -285,7 +285,7 @@ share_data_config = dict(
 
 test_data_config = dict(
     pipeline=test_pipeline,
-    ann_file=data_root + 'bevdetv3-nuscenes_infos_val.pkl')
+    ann_file=data_root + 'bevdetv3-nuscenes_infos_val_mini.pkl')
 
 data = dict(
     samples_per_gpu=8,
@@ -332,4 +332,5 @@ custom_hooks = [
     ),
 ]
 
+load_from = "/root/BEVDet/ckpts/bevdet-r50-4d-stereo-cbgs.pth"
 # fp16 = dict(loss_scale='dynamic')

@@ -2,6 +2,7 @@
 from .base import Base3DDetector
 from .bevdet import BEVDepth4D, BEVDet, BEVDet4D, BEVDetTRT, BEVStereo4D
 from .bevdet_occ import BEVStereo4DOCC
+from .bevdet_dual import BEVStereo4D_Dual
 from .centerpoint import CenterPoint
 from .dal import DAL
 from .dynamic_voxelnet import DynamicVoxelNet
@@ -28,5 +29,5 @@ __all__ = [
     'CenterPoint', 'SSD3DNet', 'ImVoteNet', 'SingleStageMono3DDetector',
     'FCOSMono3D', 'ImVoxelNet', 'GroupFree3DNet', 'PointRCNN', 'SMOKEMono3D',
     'MinkSingleStage3DDetector', 'SASSD', 'BEVDet', 'BEVDet4D', 'BEVDepth4D',
-    'BEVDetTRT', 'BEVStereo4D', 'BEVStereo4DOCC'
+    'BEVDetTRT', 'BEVStereo4D', 'BEVStereo4DOCC', 'BEVStereo4D_Dual'
 ]

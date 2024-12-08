@@ -12,11 +12,16 @@ We build a dual-branch bird=eye-view perception model and mainly refer to the fo
 
 step 1. Please prepare environment:
 ```
-torch=1.10.0+cu113
-torchvision=0.11.1+cu113
-mmcv-full=1.5.3
-mmdet=2.25.1
-mmsegmentation=1.0.0rc4
+pip install torch=1.10.0+cu113 -f https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch/linux-64/
+pip install torchvision=0.11.1+cu113 -f https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch/linux-64/
+pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-1.11.0+cu113.html
+pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-1.11.0+cu113.html
+pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-1.11.0+cu113.html
+pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.11.0+cu113.html
+pip install -U -i https://pypi.tuna.tsinghua.edu.cn/simple torch_geometric==2.5.0
+pip install mmcv-full=1.5.3 -f https://download.openmmlab.com/mmcv/dist/cu113/torch1.10.0/index.html
+pip install mmdet=2.25.1 mmsegmentation=1.0.0rc4 -i https://pypi.tuna.tsinghua.edu.cn/simple 
+pip install numba==0.53.0 
 ```
 
 step 2. Prepare bevdet repo by.
