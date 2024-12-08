@@ -1,5 +1,7 @@
 # BEVDet_Dual
 
+![Visualization](./docs/vis.gif)
+
 ## Introduction
 We build a dual-branch bird=eye-view perception model and mainly refer to the following two papers:
 1.  https://arxiv.org/abs/2112.11790
@@ -44,6 +46,9 @@ step 4. For Occupancy Prediction task, download (only) the 'gts' from [CVPR2023-
     └── gts (new)
 ```
 
+step 4. Download models(v1.0)
+To test the model, please first download the trained model from the url(https://pan.baidu.com/s/1d7vXrqrM5304fumXX0sLBg?pwd=66is). And keep the models in the path workspace/ckpts/
+
 #### Train model
 ```shell
 # single gpu
@@ -54,10 +59,12 @@ python tools/train.py configs/bevdet_dual_occ/bevdet-occ-r50-4d-stereo.py
 
 #### Test model
 ```shell
-# single gpu
+# single gpu perception
 python tools/test.py configs/bevdet_dual_occ/bevdet-occ-r50-4d-stereo.py $checkpoint --eval mAP
-# multiple gpu
+# multiple gpu perception
 ./tools/dist_test.sh configs/bevdet_dual_occ/bevdet-occ-r50-4d-stereo.py $checkpoint num_gpu --eval mAP
+# Entire Pipeline Test(Remained to be optimized) 
+python tools/inference.py configs/bevdet_dual_occ/bevdet-occ-r50-4d-stereo.py ckpts/bev_occ.pth
 ```
 
 ## Next Steps
